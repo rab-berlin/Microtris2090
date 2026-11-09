@@ -1,7 +1,10 @@
-; tetris-05.mic - Tetris für Busch Microtronic 2090 mit 8x8-LED-Matrix und 4 Tastern
+; microtris-06.mic - Tetris für Busch Microtronic 2090 mit 8x8-LED-Matrix (ESP2090 Studio) und 4 Tastern
 ; 256 Schritte (00-FF), frei: 0
-; Start: Reset (z), laden (l), Matrix mit m aktivieren, Ansicht v, RUN.
-;   Alle Register müssen 0 sein. Matrix vergessen? Das Programm wartet ohne Bild: einmal m drücken.
+; Version 06: Matrix des ESP2090 Studios. Zwischen den Bildern schlaeft sie (ACK 15, kein REQ), damit Eingang 1
+;   Taster links sein kann; vor dem Bild weckt F, dann folgt sofort ACK 1. Die Taster werden im Befehl
+;   zwischen ACK und erstem Wert gelesen. Kolli faellt in Rand (1 Schritt gespart).
+; Start: Reset, Matrix einschalten (Weboberflaeche: LED on, Emulator2090: m), RUN.
+;   Alle Register müssen 0 sein. Matrix vergessen? Das Programm wartet am Anfang ohne Bild: Matrix einschalten.
 ; Tempo aus den gelöschten Reihen: der Stein fällt alle 5 - Reihen/4 Durchläufe,
 ;   0-3 Reihen 2,5 s je Reihe, 4-7 2,1 s, 8-11 1,75 s, 12-15 1,4 s, ab 16 jeden Durchlauf 1,0 s.
 ; Taster 1 (Pfeil links) = links, 4 (Pfeil rechts) = rechts,
@@ -14,7 +17,7 @@
 ; Volle Reihen 1-7 verschwinden. Spielende, wenn nach dem Landen etwas in Reihe 8 liegt:
 ;   Anzeige = gelöschte Reihen dezimal. Neues Spiel: Reset.
 ; Zeiten: Durchlauf ohne Taste 0,38 s, Fallen +0,6 s, Zug oder Drehen +0,6 bis 0,9 s.
-; Die Matrix ist nur während des Bildes aktiv, sonst inaktiv: Eingang 1 ist dann Taster links.
+; Die Matrix ist nur für das Bild wach, sonst schlaeft sie: Eingang 1 ist dann Taster links.
 ;
 ; Feld: R0-R7 = Reihe 1-8 (unten nach oben), Bit 1 = Spalte 1 (links). Der Stein ist im Feld eingezeichnet.
 ; Zwei Kontexte in R8-RF, Wechsel mit EXRM (der andere liegt in M8-MF).
@@ -39,7 +42,7 @@
 ;   REIHEN_H  rE  Kontext B: gelöschte Reihen, Sechzehner
 
 F02   ; 00  Beginn   DISOUT                   Anzeige aus: 9,3 ms je Befehl (Takt der Matrix)
-BFB   ; 01           CALL    Tog              Matrix aus (nach dem Einschalten aktiv)
+BF8   ; 01           CALL    Schlaf           Matrix schlafen (nach LED Start ist sie wach): Eingang 1 frei
 
 9F0   ; 02  Voll     CMPI    #F,r0            Reihe 1 voll?
 E15   ; 03           BRZ     Weg0
@@ -107,7 +110,7 @@ FB8   ; 31           ADC     FORM
 C2E   ; 32           GOTO    DrL
 
 129   ; 33  DrE      MOVI    #2,SPALTE        Masken in Spalte 2-3 = neue Vorschau
-BA6   ; 34           CALL    Masken
+BA3   ; 34           CALL    Masken
 F7B   ; 35           MAS     UNTEN            nach MB = VOR_U im Kontext B
 F7C   ; 36           MAS     OBEN             nach MC = VOR_O
 07B   ; 37           MOV     r7,UNTEN         aktueller Stein = alte Vorschau
@@ -124,63 +127,63 @@ AD8   ; 41           OR      MASKE,FORM
 E20   ; 42           BRZ     Neu0             leer: Spielbeginn ohne Vorschau
 18A   ; 43           MOVI    #8,ZEILE         obere Kastenzeile über Reihe 8 (unsichtbar)
 15F   ; 44           MOVI    #5,AKT           nicht 0 (0 = gelandet)
-C53   ; 45           GOTO    Fertig           untere Zeile steht schon im Feld
+C55   ; 45           GOTO    Fertig           untere Zeile steht schon im Feld
 
-BA1   ; 46  Zug      CALL    Neg              Stein löschen: minus Masken addieren
-BBF   ; 47           CALL    Acc
+B9E   ; 46  Zug      CALL    Neg              Stein löschen: minus Masken addieren
+BBC   ; 47           CALL    Acc
 
-B8A   ; 48  ZugM     CALL    Mod              Aktion ausführen (fallen/hoch springen direkt nach Setzen)
-BA6   ; 49           CALL    Masken
-D87   ; 4A           BRC     Rand             über den Rand
+B87   ; 48  ZugM     CALL    Mod              Aktion ausführen (fallen/hoch springen direkt nach Setzen)
+BA3   ; 49           CALL    Masken
+D52   ; 4A           BRC     Rand             über den Rand
 
-BBF   ; 4B  Setzen   CALL    Acc              Stein addieren; MASKE, ALT = alte Zeilen
+BBC   ; 4B  Setzen   CALL    Acc              Stein addieren; MASKE, ALT = alte Zeilen
 2BD   ; 4C           AND     UNTEN,MASKE      Treffer = alte Zeile UND Maske
 2CE   ; 4D           AND     OBEN,ALT
 ADE   ; 4E           OR      MASKE,ALT
-E53   ; 4F           BRZ     Fertig
+E55   ; 4F           BRZ     Fertig
 
-F8F   ; 50  Kolli    INV     AKT              Treffer: Gegenaktion 5 - AKT, Stein wieder löschen
-7AF   ; 51           SUBI    #A,AKT
-C46   ; 52           GOTO    Zug
+B9E   ; 50  Kolli    CALL    Neg              Treffer: Stein wieder löschen ...
+BBC   ; 51           CALL    Acc
+F8F   ; 52  Rand     INV     AKT              ... Gegenaktion 5 - AKT (auch über den Rand)
+7AF   ; 53           SUBI    #A,AKT
+C48   ; 54           GOTO    ZugM
 
-F7F   ; 53  Fertig   MAS     AKT              AKT über MF in den Kontext B
-F0E   ; 54           EXRM                     Kontext B
-0FF   ; 55           MOV     AKT,AKT          0 = Fallen wurde zurückgenommen: gelandet
-E02   ; 56           BRZ     Voll
+F7F   ; 55  Fertig   MAS     AKT              AKT über MF in den Kontext B
+F0E   ; 56           EXRM                     Kontext B
+0FF   ; 57           MOV     AKT,AKT          0 = Fallen wurde zurückgenommen: gelandet
+E02   ; 58           BRZ     Voll
 
-719   ; 57  Grav     SUBI    #1,ZAEHL         Fallzähler (auch direkt nach dem Fallen): bei Unterlauf fallen
-D7B   ; 58           BRC     Fall
+719   ; 59  Grav     SUBI    #1,ZAEHL         Fallzähler (auch direkt nach dem Fallen): bei Unterlauf fallen
+D7B   ; 5A           BRC     Fall
 
-BFB   ; 59  Bild     CALL    Tog              Matrix ein; HILF = 0 für die rechten Hälften und das Endnibble
+BFB   ; 5B  Bild     CALL    Tog              Matrix wecken (F, dann 0): der ESP setzt sofort REQ; HILF = 0
 
-FDF   ; 5A  BW       DIN     AKT              auf Bereit-Signal (Eingang 1) warten
-31F   ; 5B           ANDI    #1,AKT
-E5A   ; 5C           BRZ     BW
-FEF   ; 5D           DOT     AKT              Startnibble 1
-FE0   ; 5E           DOT     r0               Reihe 1 links
-FEA   ; 5F           DOT     HILF             Reihe 1 rechts: dunkel
-FE1   ; 60           DOT     r1               Reihe 2 links
-FEA   ; 61           DOT     HILF             Reihe 2 rechts: dunkel
-FE2   ; 62           DOT     r2               Reihe 3 links
-FEA   ; 63           DOT     HILF             Reihe 3 rechts: dunkel
-FE3   ; 64           DOT     r3               Reihe 4 links
-FEA   ; 65           DOT     HILF             Reihe 4 rechts: dunkel
-FE4   ; 66           DOT     r4               Reihe 5 links
-FEA   ; 67           DOT     HILF             Reihe 5 rechts: dunkel
-FE5   ; 68           DOT     r5               Reihe 6 links
-FEA   ; 69           DOT     HILF             Reihe 6 rechts: dunkel
-FE6   ; 6A           DOT     r6               Reihe 7 links
-FEB   ; 6B           DOT     VOR_U            Reihe 7 rechts: Vorschau unten
-FE7   ; 6C           DOT     r7               Reihe 8 links
-FEC   ; 6D           DOT     VOR_O            Reihe 8 rechts: Vorschau oben
-FEA   ; 6E           DOT     HILF             Endnibble 0
-BFB   ; 6F           CALL    Tog              Matrix aus: Eingang 1 ist wieder Taster links
-FDF   ; 70           DIN     AKT              Taster: nur neu gedrückte zählen
-08A   ; 71           MOV     TASTE,HILF
+11F   ; 5C           MOVI    #1,AKT           ACK 1 = Blockmodus (REQ steht nach dem Wecken)
+FEF   ; 5D           DOT     AKT              ACK 1
+FDF   ; 5E           DIN     AKT              Taster: der eine Befehl zwischen ACK und erstem Wert (REQ ist jetzt Low)
+FE0   ; 5F           DOT     r0               Reihe 1 links
+FEA   ; 60           DOT     HILF             Reihe 1 rechts: dunkel
+FE1   ; 61           DOT     r1               Reihe 2 links
+FEA   ; 62           DOT     HILF             Reihe 2 rechts: dunkel
+FE2   ; 63           DOT     r2               Reihe 3 links
+FEA   ; 64           DOT     HILF             Reihe 3 rechts: dunkel
+FE3   ; 65           DOT     r3               Reihe 4 links
+FEA   ; 66           DOT     HILF             Reihe 4 rechts: dunkel
+FE4   ; 67           DOT     r4               Reihe 5 links
+FEA   ; 68           DOT     HILF             Reihe 5 rechts: dunkel
+FE5   ; 69           DOT     r5               Reihe 6 links
+FEA   ; 6A           DOT     HILF             Reihe 6 rechts: dunkel
+FE6   ; 6B           DOT     r6               Reihe 7 links
+FEB   ; 6C           DOT     VOR_U            Reihe 7 rechts: Vorschau unten
+FE7   ; 6D           DOT     r7               Reihe 8 links
+FEC   ; 6E           DOT     VOR_O            Reihe 8 rechts: Vorschau oben
+FEA   ; 6F           DOT     HILF             Ausgaenge 0: Uebertragung fertig
+BF8   ; 70           CALL    Schlaf           Matrix schlafen
+08A   ; 71           MOV     TASTE,HILF       nur neu gedrückte Taster zählen
 F8A   ; 72           INV     HILF
 0F8   ; 73           MOV     AKT,TASTE
 2FA   ; 74           AND     AKT,HILF
-E57   ; 75           BRZ     Grav
+E59   ; 75           BRZ     Grav
 10F   ; 76           MOVI    #0,AKT           AKT = Nummer des niedrigsten neuen Tasters
 
 51F   ; 77  TNr      ADDI    #1,AKT
@@ -203,154 +206,154 @@ F7F   ; 84  Los      MAS     AKT              AKT über MF in den Kontext A
 F0E   ; 85           EXRM
 C46   ; 86           GOTO    Zug
 
-F8F   ; 87  Rand     INV     AKT              Gegenaktion 5 - AKT
-7AF   ; 88           SUBI    #A,AKT
-C48   ; 89           GOTO    ZugM
 
-92F   ; 8A  Mod      CMPI    #2,AKT
-D91   ; 8B           BRC     M345
-E98   ; 8C           BRZ     MRe
-0FF   ; 8D           MOV     AKT,AKT
-E9D   ; 8E           BRZ     MHoch
+92F   ; 87  Mod      CMPI    #2,AKT
+D8E   ; 88           BRC     M345
+E95   ; 89           BRZ     MRe
+0FF   ; 8A           MOV     AKT,AKT
+E9A   ; 8B           BRZ     MHoch
 
-719   ; 8F  MLi      SUBI    #1,SPALTE        1: links
-F07   ; 90           RET
+719   ; 8C  MLi      SUBI    #1,SPALTE        1: links
+F07   ; 8D           RET
 
-94F   ; 91  M345     CMPI    #4,AKT
-D9E   ; 92           BRC     MFall
-E9B   ; 93           BRZ     MRechts
+94F   ; 8E  M345     CMPI    #4,AKT
+D9B   ; 8F           BRC     MFall
+E98   ; 90           BRZ     MRechts
 
-FA8   ; 94  MLd      SHL     FORM             3: links drehen = 3 mal rechts drehen
-FB8   ; 95           ADC     FORM
-FA8   ; 96           SHL     FORM
-FB8   ; 97           ADC     FORM
+FA8   ; 91  MLd      SHL     FORM             3: links drehen = 3 mal rechts drehen
+FB8   ; 92           ADC     FORM
+FA8   ; 93           SHL     FORM
+FB8   ; 94           ADC     FORM
 
-FA8   ; 98  MRe      SHL     FORM             2: rechts drehen
-FB8   ; 99           ADC     FORM
-F07   ; 9A           RET
+FA8   ; 95  MRe      SHL     FORM             2: rechts drehen
+FB8   ; 96           ADC     FORM
+F07   ; 97           RET
 
-519   ; 9B  MRechts  ADDI    #1,SPALTE        4: rechts
-F07   ; 9C           RET
+519   ; 98  MRechts  ADDI    #1,SPALTE        4: rechts
+F07   ; 99           RET
 
-52A   ; 9D  MHoch    ADDI    #2,ZEILE         0: hoch (Fallen zurücknehmen): +2, dann -1
+52A   ; 9A  MHoch    ADDI    #2,ZEILE         0: hoch (Fallen zurücknehmen): +2, dann -1
 
-71A   ; 9E  MFall    SUBI    #1,ZEILE         5: fallen
-BA1   ; 9F           CALL    Neg              Masken bleiben, wieder positiv
-C4B   ; A0           GOTO    Setzen
+71A   ; 9B  MFall    SUBI    #1,ZEILE         5: fallen
+B9E   ; 9C           CALL    Neg              Masken bleiben, wieder positiv
+C4B   ; 9D           GOTO    Setzen
 
-F8B   ; A1  Neg      INV     UNTEN            Masken negieren (0 - Maske)
-51B   ; A2           ADDI    #1,UNTEN
-F8C   ; A3           INV     OBEN
-51C   ; A4           ADDI    #1,OBEN
-F07   ; A5           RET
+F8B   ; 9E  Neg      INV     UNTEN            Masken negieren (0 - Maske)
+51B   ; 9F           ADDI    #1,UNTEN
+F8C   ; A0           INV     OBEN
+51C   ; A1           ADDI    #1,OBEN
+F07   ; A2           RET
 
-08C   ; A6  Masken   MOV     FORM,OBEN        oben: Bit 1-2
-33C   ; A7           ANDI    #3,OBEN
-08B   ; A8           MOV     FORM,UNTEN       unten: Bit 4 (rechts) -> 2, Bit 8 (links) -> 1
-34B   ; A9           ANDI    #4,UNTEN
-F9B   ; AA           SHR     UNTEN
-978   ; AB           CMPI    #7,FORM
-FBB   ; AC           ADC     UNTEN
-0CD   ; AD           MOV     OBEN,MASKE       Vereinigung prüft den Rand
-ABD   ; AE           OR      UNTEN,MASKE
-09E   ; AF           MOV     SPALTE,ALT
-71E   ; B0           SUBI    #1,ALT
-DB9   ; B1           BRC     MsLi             Spalte 0: eine nach links
+08C   ; A3  Masken   MOV     FORM,OBEN        oben: Bit 1-2
+33C   ; A4           ANDI    #3,OBEN
+08B   ; A5           MOV     FORM,UNTEN       unten: Bit 4 (rechts) -> 2, Bit 8 (links) -> 1
+34B   ; A6           ANDI    #4,UNTEN
+F9B   ; A7           SHR     UNTEN
+978   ; A8           CMPI    #7,FORM
+FBB   ; A9           ADC     UNTEN
+0CD   ; AA           MOV     OBEN,MASKE       Vereinigung prüft den Rand
+ABD   ; AB           OR      UNTEN,MASKE
+09E   ; AC           MOV     SPALTE,ALT
+71E   ; AD           SUBI    #1,ALT
+DB6   ; AE           BRC     MsLi             Spalte 0: eine nach links
 
-71E   ; B2  MsL      SUBI    #1,ALT           SPALTE-1 mal nach rechts
-DBD   ; B3           BRC     MsOk
-FAD   ; B4           SHL     MASKE
-DBE   ; B5           BRC     MsRet            rechter Rand
-FAC   ; B6           SHL     OBEN
-FAB   ; B7           SHL     UNTEN
-CB2   ; B8           GOTO    MsL
+71E   ; AF  MsL      SUBI    #1,ALT           SPALTE-1 mal nach rechts
+DBA   ; B0           BRC     MsOk
+FAD   ; B1           SHL     MASKE
+DBB   ; B2           BRC     MsRet            rechter Rand
+FAC   ; B3           SHL     OBEN
+FAB   ; B4           SHL     UNTEN
+CAF   ; B5           GOTO    MsL
 
-F9D   ; B9  MsLi     SHR     MASKE
-DBE   ; BA           BRC     MsRet            linker Rand
-F9C   ; BB           SHR     OBEN
-F9B   ; BC           SHR     UNTEN
+F9D   ; B6  MsLi     SHR     MASKE
+DBB   ; B7           BRC     MsRet            linker Rand
+F9C   ; B8           SHR     OBEN
+F9B   ; B9           SHR     UNTEN
 
-F0A   ; BD  MsOk     RSC
+F0A   ; BA  MsOk     RSC
 
-F07   ; BE  MsRet    RET
+F07   ; BB  MsRet    RET
 
-93A   ; BF  Acc      CMPI    #3,ZEILE
-DD9   ; C0           BRC     A47
-91A   ; C1           CMPI    #1,ZEILE
-DCD   ; C2           BRC     A23
-EC8   ; C3           BRZ     A1
+93A   ; BC  Acc      CMPI    #3,ZEILE
+DD6   ; BD           BRC     A47
+91A   ; BE           CMPI    #1,ZEILE
+DCA   ; BF           BRC     A23
+EC5   ; C0           BRZ     A1
 
-1FD   ; C4  A0       MOVI    #F,MASKE         untere Zeile = Boden
-00E   ; C5           MOV     r0,ALT
-4C0   ; C6           ADD     OBEN,r0
-F07   ; C7           RET
+1FD   ; C1  A0       MOVI    #F,MASKE         untere Zeile = Boden
+00E   ; C2           MOV     r0,ALT
+4C0   ; C3           ADD     OBEN,r0
+F07   ; C4           RET
 
-00D   ; C8  A1       MOV     r0,MASKE
-4B0   ; C9           ADD     UNTEN,r0
-01E   ; CA           MOV     r1,ALT
-4C1   ; CB           ADD     OBEN,r1
-F07   ; CC           RET
+00D   ; C5  A1       MOV     r0,MASKE
+4B0   ; C6           ADD     UNTEN,r0
+01E   ; C7           MOV     r1,ALT
+4C1   ; C8           ADD     OBEN,r1
+F07   ; C9           RET
 
-92A   ; CD  A23      CMPI    #2,ZEILE
-ED4   ; CE           BRZ     A2
+92A   ; CA  A23      CMPI    #2,ZEILE
+ED1   ; CB           BRZ     A2
 
-02D   ; CF  A3       MOV     r2,MASKE
-4B2   ; D0           ADD     UNTEN,r2
-03E   ; D1           MOV     r3,ALT
-4C3   ; D2           ADD     OBEN,r3
-F07   ; D3           RET
+02D   ; CC  A3       MOV     r2,MASKE
+4B2   ; CD           ADD     UNTEN,r2
+03E   ; CE           MOV     r3,ALT
+4C3   ; CF           ADD     OBEN,r3
+F07   ; D0           RET
 
-01D   ; D4  A2       MOV     r1,MASKE
-4B1   ; D5           ADD     UNTEN,r1
-02E   ; D6           MOV     r2,ALT
-4C2   ; D7           ADD     OBEN,r2
-F07   ; D8           RET
+01D   ; D1  A2       MOV     r1,MASKE
+4B1   ; D2           ADD     UNTEN,r1
+02E   ; D3           MOV     r2,ALT
+4C2   ; D4           ADD     OBEN,r2
+F07   ; D5           RET
 
-95A   ; D9  A47      CMPI    #5,ZEILE
-DE6   ; DA           BRC     A6
-EE1   ; DB           BRZ     A5
+95A   ; D6  A47      CMPI    #5,ZEILE
+DE3   ; D7           BRC     A6
+EDE   ; D8           BRZ     A5
 
-03D   ; DC  A4       MOV     r3,MASKE
-4B3   ; DD           ADD     UNTEN,r3
-04E   ; DE           MOV     r4,ALT
-4C4   ; DF           ADD     OBEN,r4
-F07   ; E0           RET
+03D   ; D9  A4       MOV     r3,MASKE
+4B3   ; DA           ADD     UNTEN,r3
+04E   ; DB           MOV     r4,ALT
+4C4   ; DC           ADD     OBEN,r4
+F07   ; DD           RET
 
-04D   ; E1  A5       MOV     r4,MASKE
-4B4   ; E2           ADD     UNTEN,r4
-05E   ; E3           MOV     r5,ALT
-4C5   ; E4           ADD     OBEN,r5
-F07   ; E5           RET
+04D   ; DE  A5       MOV     r4,MASKE
+4B4   ; DF           ADD     UNTEN,r4
+05E   ; E0           MOV     r5,ALT
+4C5   ; E1           ADD     OBEN,r5
+F07   ; E2           RET
 
-97A   ; E6  A6       CMPI    #7,ZEILE
-DF3   ; E7           BRC     A8
-EEE   ; E8           BRZ     A7
+97A   ; E3  A6       CMPI    #7,ZEILE
+DF0   ; E4           BRC     A8
+EEB   ; E5           BRZ     A7
 
-05D   ; E9  A6L      MOV     r5,MASKE
-4B5   ; EA           ADD     UNTEN,r5
-06E   ; EB           MOV     r6,ALT
-4C6   ; EC           ADD     OBEN,r6
-F07   ; ED           RET
+05D   ; E6  A6L      MOV     r5,MASKE
+4B5   ; E7           ADD     UNTEN,r5
+06E   ; E8           MOV     r6,ALT
+4C6   ; E9           ADD     OBEN,r6
+F07   ; EA           RET
 
-06D   ; EE  A7       MOV     r6,MASKE
-4B6   ; EF           ADD     UNTEN,r6
-07E   ; F0           MOV     r7,ALT
-4C7   ; F1           ADD     OBEN,r7
-F07   ; F2           RET
+06D   ; EB  A7       MOV     r6,MASKE
+4B6   ; EC           ADD     UNTEN,r6
+07E   ; ED           MOV     r7,ALT
+4C7   ; EE           ADD     OBEN,r7
+F07   ; EF           RET
 
-98A   ; F3  A8       CMPI    #8,ZEILE
-EF7   ; F4           BRZ     A8L
+98A   ; F0  A8       CMPI    #8,ZEILE
+EF4   ; F1           BRZ     A8L
 
-1FE   ; F5  AB       MOVI    #F,ALT           ZEILE F: obere Zeile = Boden (die untere ist dann leer)
-F07   ; F6           RET
+1FE   ; F2  AB       MOVI    #F,ALT           ZEILE F: obere Zeile = Boden (die untere ist dann leer)
+F07   ; F3           RET
 
-07D   ; F7  A8L      MOV     r7,MASKE         untere Zeile = Reihe 8
-4B7   ; F8           ADD     UNTEN,r7
-10E   ; F9           MOVI    #0,ALT           obere Zeile: über dem Feld, frei
-F07   ; FA           RET
+07D   ; F4  A8L      MOV     r7,MASKE         untere Zeile = Reihe 8
+4B7   ; F5           ADD     UNTEN,r7
+10E   ; F6           MOVI    #0,ALT           obere Zeile: über dem Feld, frei
+F07   ; F7           RET
 
-1FA   ; FB  Tog      MOVI    #F,HILF          Matrix umschalten: F für 2 Befehle (18,6 ms)
+FDA   ; F8  Schlaf   DIN     HILF             Matrix schlafen legen: auf REQ (Eingang 1) warten ...
+31A   ; F9           ANDI    #1,HILF
+EF8   ; FA           BRZ     Schlaf
+1FA   ; FB  Tog      MOVI    #F,HILF          ... ACK 15 (schlafen); Einsprung Tog: F weckt die Matrix
 FEA   ; FC           DOT     HILF
-10A   ; FD           MOVI    #0,HILF
-FEA   ; FE           DOT     HILF
+10A   ; FD           MOVI    #0,HILF          Ausgaenge 0: nach dem Schlafen kann F wieder wecken,
+FEA   ; FE           DOT     HILF             nach dem Wecken gilt das naechste ACK (HILF = 0 fuers Bild)
 F07   ; FF           RET

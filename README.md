@@ -3,7 +3,7 @@
 Tetris für den Busch Microtronic 2090 mit 8x8-LED-Matrix und 4 Tastern.
 
 - 256 Programmschritte, alle belegt
-- Datei: [microtris.mic](microtris.mic) (Version 05)
+- Datei: [microtris.mic](microtris.mic) (Version 06)
 
 ## Spiel
 
@@ -27,15 +27,16 @@ Nur neu gedrückte Taster zählen: ein Druck ist ein Schritt.
 
 ## Start
 
-RESET (alle Register 0, das Programm enthält kein CLEAR), Matrix einschalten, `HALT` `NEXT` `00` `RUN`. Neues Spiel: RESET.
+RESET (alle Register 0, das Programm enthält kein CLEAR), Matrix einschalten (siehe unten), `HALT` `NEXT` `00` `RUN`. Neues Spiel: RESET.
 
 ## Matrixprotokoll
 
-Das Programm verwendet das **frühere Blockprotokoll** der Matrix:
-- Bereit-Signal auf Eingang 1
-- Startnibble 1, 16 Werte, Endnibble 0
-- ein F von 15-25 ms schaltet die Matrix um
+Das Programm arbeitet mit dem [ESP2090 Studio](https://github.com/rab-berlin/ESP2090) (Blockmodus mit Schlafmodus):
 
-Weil Eingang 1 auch Taster ist, schaltet das Programm die Matrix nur für die Bildausgabe ein.
+- **Schlafen:** Zwischen den Bildern schläft die Matrix (ACK 15). Der ESP setzt dann kein REQ und ignoriert die Ausgänge, so ist Eingang 1 frei für Taster links.
+- **Wecken und Bild:** Für ein Bild weckt das Programm die Matrix mit F und dann 0 auf den Ausgängen. Danach folgen sofort ACK 1, genau ein Befehl und die 16 Register.
+- **Wieder schlafen:** Danach setzt das Programm die Ausgänge auf 0 und legt die Matrix wieder schlafen.
 
-Im [Emulator2090](https://github.com/rab-berlin/Emulator2090) die Matrix mit `m` auf `alt` stellen. Für das aktuelle Protokoll des [ESP2090 Studios](https://github.com/rab-berlin/ESP2090) muss das Programm noch umgestellt werden.
+Auf der Weboberfläche „LED on“ drücken, im [Emulator2090](https://github.com/rab-berlin/Emulator2090) die Matrix mit `m` einschalten (Modus ESP). Die Matrix muss vor dem Start eingeschaltet sein.
+
+Bis Version 05 lief das Programm mit dem früheren Blockprotokoll (Startnibble 1, Endnibble 0, Umschaltsignal F). In Version 06 liest das Programm die Taster in dem einen Befehl zwischen ACK und erstem Register, weil REQ dann sicher Low ist. Dass Kollision und Rand jetzt denselben Rückweg nehmen, spart den Platz für den Schlafmodus: Es bleibt bei 256 Schritten.
