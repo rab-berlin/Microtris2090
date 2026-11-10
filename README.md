@@ -2,8 +2,8 @@
 
 Tetris für den Busch Microtronic 2090 mit 8x8-LED-Matrix und 4 Tastern.
 
-- 256 Programmschritte, alle belegt
-- Datei: [microtris.mic](microtris.mic) (Version 07)
+- 255 Programmschritte, 1 frei
+- Datei: [microtris.mic](microtris.mic) (Version 08)
 
 ## Spiel
 
@@ -34,9 +34,11 @@ RESET (alle Register 0, das Programm enthält kein CLEAR), Matrix einschalten (s
 Das Programm arbeitet mit dem [ESP2090 Studio](https://github.com/rab-berlin/ESP2090) (Blockmodus mit Schlafmodus):
 
 - **Schlafen:** Zwischen den Bildern schläft die Matrix (ACK 15). Der ESP setzt dann kein REQ und ignoriert die Ausgänge, so ist Eingang 1 frei für Taster links.
-- **Wecken und Bild:** Für ein Bild weckt das Programm die Matrix mit F und dann 0 auf den Ausgängen. Dann wartet es auf REQ und sendet ACK 1, genau einen Befehl und die 16 Register. Das Warten macht das Programm unabhängig davon, wie schnell der ESP aufwacht.
-- **Wieder schlafen:** Danach setzt das Programm die Ausgänge auf 0 und legt die Matrix wieder schlafen.
+- **Wecken und Bild:** Für ein Bild legt das Programm F an und hält es, bis der ESP mit REQ antwortet. Dann sendet es direkt ACK 1, genau einen Befehl und die 16 Register. So geht kein Wecken verloren, egal wie spät der ESP nachsieht (z. B. bei offener Weboberfläche).
+- **Wieder schlafen:** Danach setzt das Programm die Ausgänge auf 0 und legt die Matrix wieder schlafen (ACK 15, nach zwei Schritten eine 0).
 
 Auf der Weboberfläche „LED on“ drücken, im [Emulator2090](https://github.com/rab-berlin/Emulator2090) die Matrix mit `m` einschalten (Modus ESP). Die Matrix muss vor dem Start eingeschaltet sein.
 
 Bis Version 05 lief das Programm mit dem früheren Blockprotokoll (Startnibble 1, Endnibble 0, Umschaltsignal F). In Version 06 liest das Programm die Taster in dem einen Befehl zwischen ACK und erstem Register, weil REQ dann sicher Low ist. Dass Kollision und Rand denselben Rückweg nehmen und zwei Sprünge durch Umordnen entfallen, spart den Platz für Schlafmodus und REQ-Warten: Es bleibt bei 256 Schritten.
+
+Das Programm braucht die Firmware des ESP2090 Studios mit dem Weck-Handshake (gehaltenes F).
