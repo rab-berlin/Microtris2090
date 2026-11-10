@@ -1,8 +1,10 @@
-; microtris-06.mic - Tetris für Busch Microtronic 2090 mit 8x8-LED-Matrix (ESP2090 Studio) und 4 Tastern
+; microtris-07.mic - Tetris für Busch Microtronic 2090 mit 8x8-LED-Matrix (ESP2090 Studio) und 4 Tastern
 ; 256 Schritte (00-FF), frei: 0
 ; Version 06: Matrix des ESP2090 Studios. Zwischen den Bildern schlaeft sie (ACK 15, kein REQ), damit Eingang 1
-;   Taster links sein kann; vor dem Bild weckt F, dann folgt sofort ACK 1. Die Taster werden im Befehl
+;   Taster links sein kann; vor dem Bild weckt F, dann folgt ACK 1. Die Taster werden im Befehl
 ;   zwischen ACK und erstem Wert gelesen. Kolli faellt in Rand (1 Schritt gespart).
+; Version 07: nach dem Wecken auf REQ warten statt ACK 1 blind zu senden (+2). Dafuer faellt Neu in Fertig
+;   und Los in Zug (der Zug-Block steht jetzt hinter Los): 2 GOTO weniger.
 ; Start: Reset, Matrix einschalten (Weboberflaeche: LED on, Emulator2090: m), RUN.
 ;   Alle Register müssen 0 sein. Matrix vergessen? Das Programm wartet am Anfang ohne Bild: Matrix einschalten.
 ; Tempo aus den gelöschten Reihen: der Stein fällt alle 5 - Reihen/4 Durchläufe,
@@ -126,85 +128,85 @@ FAD   ; 40           SHL     MASKE
 AD8   ; 41           OR      MASKE,FORM
 E20   ; 42           BRZ     Neu0             leer: Spielbeginn ohne Vorschau
 18A   ; 43           MOVI    #8,ZEILE         obere Kastenzeile über Reihe 8 (unsichtbar)
-15F   ; 44           MOVI    #5,AKT           nicht 0 (0 = gelandet)
-C55   ; 45           GOTO    Fertig           untere Zeile steht schon im Feld
+15F   ; 44           MOVI    #5,AKT           nicht 0 (0 = gelandet); untere Zeile steht schon im Feld
 
-B9E   ; 46  Zug      CALL    Neg              Stein löschen: minus Masken addieren
-BBC   ; 47           CALL    Acc
+F7F   ; 45  Fertig   MAS     AKT              AKT über MF in den Kontext B
+F0E   ; 46           EXRM                     Kontext B
+0FF   ; 47           MOV     AKT,AKT          0 = Fallen wurde zurückgenommen: gelandet
+E02   ; 48           BRZ     Voll
 
-B87   ; 48  ZugM     CALL    Mod              Aktion ausführen (fallen/hoch springen direkt nach Setzen)
-BA3   ; 49           CALL    Masken
-D52   ; 4A           BRC     Rand             über den Rand
+719   ; 49  Grav     SUBI    #1,ZAEHL         Fallzähler (auch direkt nach dem Fallen): bei Unterlauf fallen
+D6D   ; 4A           BRC     Fall
 
-BBC   ; 4B  Setzen   CALL    Acc              Stein addieren; MASKE, ALT = alte Zeilen
-2BD   ; 4C           AND     UNTEN,MASKE      Treffer = alte Zeile UND Maske
-2CE   ; 4D           AND     OBEN,ALT
-ADE   ; 4E           OR      MASKE,ALT
-E55   ; 4F           BRZ     Fertig
+BFB   ; 4B  Bild     CALL    Tog              Matrix wecken (F, dann 0): der ESP setzt sofort REQ; HILF = 0
 
-B9E   ; 50  Kolli    CALL    Neg              Treffer: Stein wieder löschen ...
-BBC   ; 51           CALL    Acc
-F8F   ; 52  Rand     INV     AKT              ... Gegenaktion 5 - AKT (auch über den Rand)
-7AF   ; 53           SUBI    #A,AKT
-C48   ; 54           GOTO    ZugM
+FDF   ; 4C  BW       DIN     AKT              nach dem Wecken auf REQ warten (danach = 1 = ACK)
+31F   ; 4D           ANDI    #1,AKT
+E4C   ; 4E           BRZ     BW
+FEF   ; 4F           DOT     AKT              ACK 1
+FDF   ; 50           DIN     AKT              Taster: der eine Befehl zwischen ACK und erstem Wert (REQ ist jetzt Low)
+FE0   ; 51           DOT     r0               Reihe 1 links
+FEA   ; 52           DOT     HILF             Reihe 1 rechts: dunkel
+FE1   ; 53           DOT     r1               Reihe 2 links
+FEA   ; 54           DOT     HILF             Reihe 2 rechts: dunkel
+FE2   ; 55           DOT     r2               Reihe 3 links
+FEA   ; 56           DOT     HILF             Reihe 3 rechts: dunkel
+FE3   ; 57           DOT     r3               Reihe 4 links
+FEA   ; 58           DOT     HILF             Reihe 4 rechts: dunkel
+FE4   ; 59           DOT     r4               Reihe 5 links
+FEA   ; 5A           DOT     HILF             Reihe 5 rechts: dunkel
+FE5   ; 5B           DOT     r5               Reihe 6 links
+FEA   ; 5C           DOT     HILF             Reihe 6 rechts: dunkel
+FE6   ; 5D           DOT     r6               Reihe 7 links
+FEB   ; 5E           DOT     VOR_U            Reihe 7 rechts: Vorschau unten
+FE7   ; 5F           DOT     r7               Reihe 8 links
+FEC   ; 60           DOT     VOR_O            Reihe 8 rechts: Vorschau oben
+FEA   ; 61           DOT     HILF             Ausgaenge 0: Uebertragung fertig
+BF8   ; 62           CALL    Schlaf           Matrix schlafen
+08A   ; 63           MOV     TASTE,HILF       nur neu gedrückte Taster zählen
+F8A   ; 64           INV     HILF
+0F8   ; 65           MOV     AKT,TASTE
+2FA   ; 66           AND     AKT,HILF
+E49   ; 67           BRZ     Grav
+10F   ; 68           MOVI    #0,AKT           AKT = Nummer des niedrigsten neuen Tasters
 
-F7F   ; 55  Fertig   MAS     AKT              AKT über MF in den Kontext B
-F0E   ; 56           EXRM                     Kontext B
-0FF   ; 57           MOV     AKT,AKT          0 = Fallen wurde zurückgenommen: gelandet
-E02   ; 58           BRZ     Voll
+51F   ; 69  TNr      ADDI    #1,AKT
+F9A   ; 6A           SHR     HILF
+D76   ; 6B           BRC     Los
+C69   ; 6C           GOTO    TNr
 
-719   ; 59  Grav     SUBI    #1,ZAEHL         Fallzähler (auch direkt nach dem Fallen): bei Unterlauf fallen
-D7B   ; 5A           BRC     Fall
+119   ; 6D  Fall     MOVI    #1,ZAEHL         Tempo: ab 16 Reihen jeden Durchlauf fallen ...
+90E   ; 6E           CMPI    #0,REIHEN_H
+D75   ; 6F           BRC     FallA
+0D9   ; 70           MOV     REIHEN_L,ZAEHL   ... sonst alle 5 - Reihen/4 Durchläufe (5, 4, 3, 2)
+F99   ; 71           SHR     ZAEHL
+F99   ; 72           SHR     ZAEHL
+F89   ; 73           INV     ZAEHL            15 - Reihen/4
+7A9   ; 74           SUBI    #A,ZAEHL         5 - Reihen/4
 
-BFB   ; 5B  Bild     CALL    Tog              Matrix wecken (F, dann 0): der ESP setzt sofort REQ; HILF = 0
+15F   ; 75  FallA    MOVI    #5,AKT           fallen
 
-11F   ; 5C           MOVI    #1,AKT           ACK 1 = Blockmodus (REQ steht nach dem Wecken)
-FEF   ; 5D           DOT     AKT              ACK 1
-FDF   ; 5E           DIN     AKT              Taster: der eine Befehl zwischen ACK und erstem Wert (REQ ist jetzt Low)
-FE0   ; 5F           DOT     r0               Reihe 1 links
-FEA   ; 60           DOT     HILF             Reihe 1 rechts: dunkel
-FE1   ; 61           DOT     r1               Reihe 2 links
-FEA   ; 62           DOT     HILF             Reihe 2 rechts: dunkel
-FE2   ; 63           DOT     r2               Reihe 3 links
-FEA   ; 64           DOT     HILF             Reihe 3 rechts: dunkel
-FE3   ; 65           DOT     r3               Reihe 4 links
-FEA   ; 66           DOT     HILF             Reihe 4 rechts: dunkel
-FE4   ; 67           DOT     r4               Reihe 5 links
-FEA   ; 68           DOT     HILF             Reihe 5 rechts: dunkel
-FE5   ; 69           DOT     r5               Reihe 6 links
-FEA   ; 6A           DOT     HILF             Reihe 6 rechts: dunkel
-FE6   ; 6B           DOT     r6               Reihe 7 links
-FEB   ; 6C           DOT     VOR_U            Reihe 7 rechts: Vorschau unten
-FE7   ; 6D           DOT     r7               Reihe 8 links
-FEC   ; 6E           DOT     VOR_O            Reihe 8 rechts: Vorschau oben
-FEA   ; 6F           DOT     HILF             Ausgaenge 0: Uebertragung fertig
-BF8   ; 70           CALL    Schlaf           Matrix schlafen
-08A   ; 71           MOV     TASTE,HILF       nur neu gedrückte Taster zählen
-F8A   ; 72           INV     HILF
-0F8   ; 73           MOV     AKT,TASTE
-2FA   ; 74           AND     AKT,HILF
-E59   ; 75           BRZ     Grav
-10F   ; 76           MOVI    #0,AKT           AKT = Nummer des niedrigsten neuen Tasters
+F7F   ; 76  Los      MAS     AKT              AKT über MF in den Kontext A
+F0E   ; 77           EXRM                     Kontext A, weiter mit Zug
 
-51F   ; 77  TNr      ADDI    #1,AKT
-F9A   ; 78           SHR     HILF
-D84   ; 79           BRC     Los
-C77   ; 7A           GOTO    TNr
+B9E   ; 78  Zug      CALL    Neg              Stein löschen: minus Masken addieren
+BBC   ; 79           CALL    Acc
 
-119   ; 7B  Fall     MOVI    #1,ZAEHL         Tempo: ab 16 Reihen jeden Durchlauf fallen ...
-90E   ; 7C           CMPI    #0,REIHEN_H
-D83   ; 7D           BRC     FallA
-0D9   ; 7E           MOV     REIHEN_L,ZAEHL   ... sonst alle 5 - Reihen/4 Durchläufe (5, 4, 3, 2)
-F99   ; 7F           SHR     ZAEHL
-F99   ; 80           SHR     ZAEHL
-F89   ; 81           INV     ZAEHL            15 - Reihen/4
-7A9   ; 82           SUBI    #A,ZAEHL         5 - Reihen/4
+B87   ; 7A  ZugM     CALL    Mod              Aktion ausführen (fallen/hoch springen direkt nach Setzen)
+BA3   ; 7B           CALL    Masken
+D84   ; 7C           BRC     Rand             über den Rand
 
-15F   ; 83  FallA    MOVI    #5,AKT           fallen
+BBC   ; 7D  Setzen   CALL    Acc              Stein addieren; MASKE, ALT = alte Zeilen
+2BD   ; 7E           AND     UNTEN,MASKE      Treffer = alte Zeile UND Maske
+2CE   ; 7F           AND     OBEN,ALT
+ADE   ; 80           OR      MASKE,ALT
+E45   ; 81           BRZ     Fertig
 
-F7F   ; 84  Los      MAS     AKT              AKT über MF in den Kontext A
-F0E   ; 85           EXRM
-C46   ; 86           GOTO    Zug
+B9E   ; 82  Kolli    CALL    Neg              Treffer: Stein wieder löschen ...
+BBC   ; 83           CALL    Acc
+F8F   ; 84  Rand     INV     AKT              ... Gegenaktion 5 - AKT (auch über den Rand)
+7AF   ; 85           SUBI    #A,AKT
+C7A   ; 86           GOTO    ZugM
 
 
 92F   ; 87  Mod      CMPI    #2,AKT
@@ -236,7 +238,7 @@ F07   ; 99           RET
 
 71A   ; 9B  MFall    SUBI    #1,ZEILE         5: fallen
 B9E   ; 9C           CALL    Neg              Masken bleiben, wieder positiv
-C4B   ; 9D           GOTO    Setzen
+C7D   ; 9D           GOTO    Setzen
 
 F8B   ; 9E  Neg      INV     UNTEN            Masken negieren (0 - Maske)
 51B   ; 9F           ADDI    #1,UNTEN
