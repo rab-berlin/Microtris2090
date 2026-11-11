@@ -29,6 +29,17 @@ Nur neu gedrückte Taster zählen: ein Druck ist ein Schritt.
 
 RESET (alle Register 0, das Programm enthält kein CLEAR), Matrix einschalten (siehe unten), `HALT` `NEXT` `00` `RUN`. Neues Spiel: RESET.
 
+## Geschichte
+
+- **Alexei Paschitnow** (Alexey Pajitnov) schrieb *Tetris* 1984 am Rechenzentrum Dorodnizyn der Akademie der Wissenschaften der Sowjetunion in Moskau. Er hat es nach eigener Aussage aus Spaß gemacht, nicht um Geld zu verdienen.
+- Die Idee kam von einem Puzzle mit hölzernen **Pentominos**, Figuren aus fünf Quadraten. Paschitnow nahm Figuren aus vier Quadraten, damit die Auswahl überschaubar bleibt. Der Name verbindet griechisch *tetra* (vier) mit *Tennis*, seinem Lieblingssport.
+- Die Rechte lagen bei der staatlichen Stelle *Elorg*, die sowjetische Software im Ausland vermarktete. Lizenzen wurden an westliche Firmen vergeben, teils ohne Wissen von Elorg. Es kam zum Rechtsstreit zwischen Mirrorsoft (Lizenz für Spielhalle und Konsole an Atari und Sega) und Nintendo, den Nintendo gewann.
+- **Henk Rogers** (BulletProof Software) reiste dazu nach Moskau und überzeugte die Beamten, die Handheld-Rechte an Nintendo zu geben. Nintendo legte *Tetris* jedem **Game Boy** bei.
+- Paschitnow selbst blieb zunächst außen vor und bekam nach Berichten rund 40 Millionen Dollar nicht. 1996, als Elorg aufgelöst wurde, gab Rogers die Rechte an ihn zurück.
+- Das Microtronic-Programm vereinfacht stark: Es kennt nur drei Formen (Ecke, Zweier, Quadrat) im 2x2-Kasten statt der sieben Tetrominos. Das Spielprinzip ist dasselbe.
+
+Quelle: LiveScience „The Bizarre History of Tetris“. Weitere Details, etwa die Mitarbeit weiterer Programmierer, habe ich nicht geprüft.
+
 ## Technik: das Feld und der Stein
 
 Das ganze Spielfeld liegt in R0-R7: eine Reihe ist ein Register, Bit 1 ist die linke Spalte. Der fallende Stein ist **in das Feld eingezeichnet**, es gibt keinen getrennten Bildspeicher. Die Matrix bekommt R0-R7 als linke Hälften der Reihen 1-8, in den rechten Hälften stehen nur die Vorschau (Reihe 7-8) und sonst Nullen.
